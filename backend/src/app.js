@@ -19,16 +19,15 @@ app.use(helmet());
 app.use(cors({ origin: 'http://localhost:3001', credentials: true }));
 app.use(express.json());
 
-// Routes
+// Health route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to MyForexAI Backend API' });
 });
 
-// Auth routes
+// Routes
 app.use('/api/auth', require('./routes/auth.routes'));
-
-// Trades routes
 app.use('/api/trades', require('./routes/trades.routes'));
+app.use('/api/charts', require('./routes/charts.routes')); // << Phase 3
 
 // Error handler
 app.use(errorHandler);
