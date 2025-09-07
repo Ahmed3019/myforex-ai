@@ -20,6 +20,10 @@ const server = http.createServer(app);
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
 
+    // Sync models with DB (auto create/alter tables)
+    await sequelize.sync({ alter: true });
+    console.log('✅ All models were synchronized successfully.');
+
     server.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
     });

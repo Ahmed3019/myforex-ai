@@ -24,7 +24,11 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to MyForexAI Backend API' });
 });
 
+// Auth routes
 app.use('/api/auth', require('./routes/auth.routes'));
+
+// Trades routes
+app.use('/api/trades', require('./routes/trades.routes'));
 
 // Error handler
 app.use(errorHandler);
