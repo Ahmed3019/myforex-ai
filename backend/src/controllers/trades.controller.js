@@ -48,7 +48,10 @@ async function closeTrade(req, res, next) {
 
     const { exitPrice } = req.body;
     trade.exitPrice = exitPrice;
-    trade.profitLoss = (exitPrice - trade.entryPrice) * (trade.direction === 'BUY' ? 1 : -1) * trade.lotSize;
+    trade.profitLoss =
+      (exitPrice - trade.entryPrice) *
+      (trade.direction === 'BUY' ? 1 : -1) *
+      trade.lotSize;
     trade.isClosed = true;
 
     await trade.save();

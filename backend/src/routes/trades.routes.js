@@ -7,18 +7,28 @@
 
 const express = require('express');
 const authenticateToken = require('../middleware/auth');
-const { getAllTrades, addTrade, updateTrade, closeTrade, deleteTrade, getStats } = require('../controllers/trades.controller');
+const {
+  getAllTrades,
+  addTrade,
+  updateTrade,
+  closeTrade,
+  deleteTrade,
+  getStats,
+} = require('../controllers/trades.controller');
 
 const router = express.Router();
 
 // Protected routes
 router.use(authenticateToken);
 
+// CRUD
 router.get('/', getAllTrades);
 router.post('/', addTrade);
 router.put('/:id', updateTrade);
 router.put('/:id/close', closeTrade);
 router.delete('/:id', deleteTrade);
+
+// Stats
 router.get('/stats/all', getStats);
 
 module.exports = router;
