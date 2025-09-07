@@ -16,7 +16,8 @@ const app = express();
 
 // Middlewares
 app.use(helmet());
-app.use(cors({ origin: 'http://localhost:3001', credentials: true }));
+// اسمح للفرونت على بورت 3000
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
 // Health route
@@ -27,7 +28,7 @@ app.get('/', (req, res) => {
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/trades', require('./routes/trades.routes'));
-app.use('/api/charts', require('./routes/charts.routes')); // << Phase 3
+app.use('/api/charts', require('./routes/charts.routes')); // Phase 3
 
 // Error handler
 app.use(errorHandler);

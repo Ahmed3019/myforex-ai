@@ -5,30 +5,24 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-const http = require('http');
 const app = require('./app');
 const { sequelize } = require('./config/db');
 
-const PORT = process.env.PORT || 3000;
-
-// Create HTTP server
-const server = http.createServer(app);
-
-// Start the server after DB connection
-(async () => {
+// Sync DB and start server
+async function startServer() {
   try {
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
-
-    // Sync models with DB (auto create/alter tables)
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('✅ All models were synchronized successfully.');
 
-    server.listen(PORT, () => {
+    const PORT = process.env.PORT || 4000; // << اشتغل على 4000
+    app.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
-    process.exit(1);
   }
-})();
+}
+
+startServer();
