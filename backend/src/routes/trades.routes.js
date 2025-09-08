@@ -31,4 +31,27 @@ router.delete('/:id', deleteTrade);
 // Stats
 router.get('/stats/all', getStats);
 
+router.post("/risk-calc", async (req, res) => {
+  try {
+    const { balance, riskPercent, entryPrice, stopLoss } = req.body;
+
+    if (!balance || !riskPercent || !entryPrice || !stopLoss) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const riskAmount = (balance * riskPercent) / 100;
+    const stopLossPips = Math.abs(entryPrice - stopLoss);
+    if (stopLossPips <= 0) {
+      return res.status(400).json({ message: "Invalid Stop Loss" });
+    }
+
+    const lotSize = riskAmount / stopLossPips;
+
+    res.json({ suggestedLot: parseFloat(lotSize.toFixed(2)) });
+  } catch (err) {
+    res.status(500).json({ message: "Risk calculation failed" });
+  }
+});
+
+
 module.exports = router;

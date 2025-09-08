@@ -7,6 +7,9 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import TradesTable from "../trades/TradesTable";
+import AddTradeForm from "../trades/AddTradeForm";
+import EditTradeModal from "../trades/EditTradeModal";
+import CloseTradeModal from "../trades/CloseTradeModal";
 import { useAuth } from "../../context/AuthContext";
 
 const TradesTab = () => {
@@ -14,6 +17,8 @@ const TradesTab = () => {
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [editTrade, setEditTrade] = useState(null);
+  const [closeTrade, setCloseTrade] = useState(null);
 
   const fetchTrades = useCallback(async () => {
     if (!token) return;
@@ -40,69 +45,32 @@ const TradesTab = () => {
     fetchTrades();
   }, [fetchTrades]);
 
-  // زر اختبار مؤقت لإضافة صفقة ديمو (نحذفه في Step 2 لما نعمل Add Trade Form)
-  const addDemoTrade = async () => {
-    if (!token) return;
-    setLoading(true);
-    setErr("");
+  const handleDelete = async (trade) => {
+    if (!window.confirm("Delete this trade?")) return;
     try {
-      const body = {
-        symbol: "EURUSD",
-        asset_class: "FX",
-        direction: "BUY",
-        tradeDate: new Date().toISOString(),
-        entryPrice: 1.1000,
-        lotSize: 1,
-        // اختياري:
-        stopLoss: 1.0950,
-        takeProfit: 1.1200,
-        notes: "Demo trade for UI testing",
-      };
-
-      const res = await fetch("/api/trades", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
+      await fetch(`/api/trades/${trade.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Failed to add demo trade");
-      }
-
-      await fetchTrades(); // اعمل تحديث فورًا
+      fetchTrades();
     } catch (e) {
-      setErr(e.message);
-    } finally {
-      setLoading(false);
+      alert(e.message);
     }
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <AddTradeForm onSuccess={fetchTrades} />
+
       <div className="flex items-center justify-between">
         <div className="font-semibold">Trades</div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchTrades}
-            className="px-3 py-2 rounded-lg bg-muted"
-            disabled={loading}
-            title="Refresh list"
-          >
-            {loading ? "Loading..." : "Refresh"}
-          </button>
-          <button
-            onClick={addDemoTrade}
-            className="px-3 py-2 rounded-lg bg-primary text-white"
-            disabled={loading}
-            title="Add a demo trade (temporary)"
-          >
-            + Add Demo
-          </button>
-        </div>
+        <button
+          onClick={fetchTrades}
+          className="px-3 py-2 rounded-lg bg-muted"
+          disabled={loading}
+        >
+          {loading ? "Loading..." : "Refresh"}
+        </button>
       </div>
 
       {err && (
@@ -113,11 +81,32 @@ const TradesTab = () => {
 
       <TradesTable
         trades={trades}
-        // هنربط دول في خطوات لاحقة:
-        onEdit={null}
-        onClose={null}
-        onDelete={null}
+        onEdit={setEditTrade}
+        onClose={setCloseTrade}
+        onDelete={handleDelete}
       />
+
+      {editTrade && (
+        <EditTradeModal
+          trade={editTrade}
+          onClose={() => setEditTrade(null)}
+          onSaved={() => {
+            setEditTrade(null);
+            fetchTrades();
+          }}
+        />
+      )}
+
+      {closeTrade && (
+        <CloseTradeModal
+          trade={closeTrade}
+          onClose={() => setCloseTrade(null)}
+          onSaved={() => {
+            setCloseTrade(null);
+            fetchTrades();
+          }}
+        />
+      )}
     </div>
   );
 };

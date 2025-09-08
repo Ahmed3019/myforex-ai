@@ -17,7 +17,12 @@ import { SettingsProvider } from "./context/SettingsContext";
 
 // Protected Route wrapper
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loadingAuth } = useAuth();
+
+  if (loadingAuth) {
+    return <div className="p-8">Loading...</div>; // لودينج مؤقت
+  }
+
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 

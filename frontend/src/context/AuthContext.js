@@ -11,11 +11,18 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
   // Load token from localStorage on init
   useEffect(() => {
-    const saved = localStorage.getItem("myforexai_token");
-    if (saved) setToken(saved);
+    try {
+      const saved = localStorage.getItem("myforexai_token");
+      if (saved) {
+        setToken(saved);
+      }
+    } finally {
+      setLoadingAuth(false); // انتهينا من التحميل
+    }
   }, []);
 
   const login = (newToken) => {
@@ -28,7 +35,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("myforexai_token");
   };
 
-  const value = { token, login, logout, isAuthenticated: !!token };
+  const value = {
+    token,
+    login,
+    logout,
+    isAuthenticated: !!token,
+    loadingAuth,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
