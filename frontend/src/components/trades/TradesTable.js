@@ -5,94 +5,184 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
 
-const cell = "px-3 py-2 border-b border-border";
-const head = "px-3 py-2 border-b border-border text-left text-sm opacity-70";
+const to5 = (v) => (v === null || v === undefined || v === "" ? "-" : Number(v).toFixed(5));
 
-// نعرض الأرقام بدقة 5 خانات بعد العلامة العشرية
-const fmtNum = (v) =>
-  typeof v === "number" && !Number.isNaN(v) ? Number(v).toFixed(5) : v ?? "-";
+const TradesTable = () => {
+  const { token } = useAuth();
+  const [trades, setTrades] = useState([]);
+  const [error, setError] = useState("");
+  const [closingId, setClosingId] = useState(null);
+  const [exitDraft, setExitDraft] = useState("");
 
-const TradesTable = ({ trades = [], onEdit, onClose, onDelete }) => {
-  if (!trades.length) {
-    return (
-      <div className="bg-card text-card-fore border border-border rounded-xl p-4">
-        <div className="opacity-80">No trades yet.</div>
-      </div>
-    );
-  }
+  const fetchTrades = useCallback(async () => {
+    if (!token) return;
+    setError("");
+    try {
+      const res = await fetch("/api/trades", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch trades");
+      // الأحدث يظهر فوق
+      setTrades(data.sort((a, b) => b.id - a.id));
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchTrades();
+  }, [fetchTrades]);
+
+  // حدّث الجدول لما يحصل أي تغيير في الداتا
+  useEffect(() => {
+    const handler = () => fetchTrades();
+    window.addEventListener("data-updated", handler);
+    return () => window.removeEventListener("data-updated", handler);
+  }, [fetchTrades]);
+
+  const closeTrade = async (id) => {
+    if (!exitDraft) return alert("Please enter Exit Price first.");
+    try {
+      const res = await fetch(`/api/trades/${id}/close`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ exitPrice: parseFloat(exitDraft) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to close trade");
+      setClosingId(null);
+      setExitDraft("");
+      await fetchTrades();
+      // بلّغ البالانس و الإحصائيات
+      window.dispatchEvent(new Event("data-updated"));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const deleteTrade = async (id) => {
+    if (!window.confirm("Delete this trade?")) return;
+    try {
+      const res = await fetch(`/api/trades/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to delete trade");
+      await fetchTrades();
+      window.dispatchEvent(new Event("data-updated"));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  if (error) return <div className="text-red-500">{error}</div>;
 
   return (
-    <div className="bg-card text-card-fore border border-border rounded-xl overflow-x-auto">
-      <table className="w-full min-w-[1000px]">
-        <thead className="bg-muted">
-          <tr>
-            <th className={head}>#</th>
-            <th className={head}>Symbol</th>
-            <th className={head}>Asset</th>
-            <th className={head}>Direction</th>
-            <th className={head}>Trade Date</th>
-            <th className={head}>Entry</th>
-            <th className={head}>SL</th>
-            <th className={head}>TP</th>
-            <th className={head}>Lot</th>
-            <th className={head}>Timeframe</th>
-            <th className={head}>Strategy</th>
-            <th className={head}>Status</th>
-            <th className={head}>P/L</th>
-            <th className={head}>Notes</th>
-            <th className={head}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((t, idx) => {
-            const status = t.isClosed ? "Closed" : "Open";
-            const tradeDate = t.tradeDate
-              ? new Date(t.tradeDate).toLocaleString()
-              : "-";
-            return (
-              <tr key={t.id || idx} className="hover:bg-muted">
-                <td className={cell}>{idx + 1}</td>
-                <td className={cell}>{t.symbol}</td>
-                <td className={cell}>{t.asset_class || "-"}</td>
-                <td className={cell}>{t.direction}</td>
-                <td className={cell}>{tradeDate}</td>
-                <td className={cell}>{fmtNum(t.entryPrice)}</td>
-                <td className={cell}>{fmtNum(t.stopLoss)}</td>
-                <td className={cell}>{fmtNum(t.takeProfit)}</td>
-                <td className={cell}>{fmtNum(t.lotSize)}</td>
-                <td className={cell}>{t.timeframe || "-"}</td>
-                <td className={cell}>{t.strategy || "-"}</td>
-                <td className={cell}>{status}</td>
-                <td className={cell}>{fmtNum(t.profitLoss)}</td>
-                <td className={cell}>{t.notes || "-"}</td>
-                <td className={`${cell} whitespace-nowrap`}>
-                  <button
-                    className="px-2 py-1 rounded bg-muted"
-                    onClick={() => onEdit && onEdit(t)}
-                  >
-                    Edit
-                  </button>{" "}
-                  <button
-                    className="px-2 py-1 rounded bg-primary text-white"
-                    onClick={() => onClose && onClose(t)}
-                    disabled={t.isClosed}
-                  >
-                    Close
-                  </button>{" "}
-                  <button
-                    className="px-2 py-1 rounded bg-red-500 text-white"
-                    onClick={() => onDelete && onDelete(t)}
-                  >
-                    Delete
-                  </button>
+    <div className="bg-white rounded border">
+      <div className="px-4 py-2 border-b font-semibold">Trades</div>
+      <div className="max-h-96 overflow-y-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 sticky top-0">
+            <tr>
+              <th className="p-2 text-left">ID</th>
+              <th className="p-2 text-left">Symbol</th>
+              <th className="p-2 text-left">Asset</th>
+              <th className="p-2 text-left">Direction</th>
+              <th className="p-2 text-left">Entry</th>
+              <th className="p-2 text-left">Exit</th>
+              <th className="p-2 text-left">SL</th>
+              <th className="p-2 text-left">TP</th>
+              <th className="p-2 text-left">Lot</th>
+              <th className="p-2 text-left">Timeframe</th>
+              <th className="p-2 text-left">Strategy</th>
+              <th className="p-2 text-left">P/L</th>
+              <th className="p-2 text-left">Status</th>
+              <th className="p-2 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trades.map((t) => (
+              <tr key={t.id} className="border-t">
+                <td className="p-2">{t.id}</td>
+                <td className="p-2">{t.symbol}</td>
+                <td className="p-2">{t.asset_class}</td>
+                <td className="p-2">{t.direction}</td>
+                <td className="p-2">{to5(t.entryPrice)}</td>
+                <td className="p-2">{to5(t.exitPrice)}</td>
+                <td className="p-2">{to5(t.stopLoss)}</td>
+                <td className="p-2">{to5(t.takeProfit)}</td>
+                <td className="p-2">{t.lotSize ? Number(t.lotSize).toFixed(2) : "-"}</td>
+                <td className="p-2">{t.timeframe || "-"}</td>
+                <td className="p-2">{t.strategy || "-"}</td>
+                <td className={`p-2 font-semibold ${t.profitLoss > 0 ? "text-green-600" : t.profitLoss < 0 ? "text-red-600" : ""}`}>
+                  {to5(t.profitLoss)}
+                </td>
+                <td className="p-2">{t.isClosed ? "Closed" : "Open"}</td>
+                <td className="p-2">
+                  {!t.isClosed ? (
+                    <div className="flex items-center gap-2">
+                      {closingId === t.id ? (
+                        <>
+                          <input
+                            className="border rounded px-2 py-1 w-28"
+                            placeholder="Exit Price"
+                            value={exitDraft}
+                            onChange={(e) => setExitDraft(e.target.value)}
+                          />
+                          <button
+                            className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                            onClick={() => closeTrade(t.id)}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                            onClick={() => {
+                              setClosingId(null);
+                              setExitDraft("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                          onClick={() => setClosingId(t.id)}
+                        >
+                          Close
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                      onClick={() => deleteTrade(t.id)}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            ))}
+            {trades.length === 0 && (
+              <tr>
+                <td className="p-4 text-center text-gray-500" colSpan={14}>
+                  No trades yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

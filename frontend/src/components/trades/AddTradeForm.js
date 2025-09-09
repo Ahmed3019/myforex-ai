@@ -5,78 +5,53 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useTradeDraft } from "../../context/TradeDraftContext";
 
-const SYMBOLS = {
-  FX: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"],
-  Metals: ["XAUUSD", "XAGUSD"],
-  Energy: ["WTI", "Brent"],
-  Crypto: ["BTCUSD", "ETHUSD"],
+const defaultState = {
+  symbol: "EURUSD",
+  asset_class: "FX",
+  direction: "BUY",
+  tradeDate: "",
+  entryPrice: "",
+  stopLoss: "",
+  takeProfit: "",
+  lotSize: "",
+  timeframe: "",
+  strategy: "",
+  notes: "",
 };
 
-const TIMEFRAMES = ["M1", "M5", "M15", "H1", "H4", "D1"];
-const STRATEGIES = ["Scalping", "Swing", "Trend Following", "News Trading"];
-
-const AddTradeForm = ({ onSuccess }) => {
+const AddTradeForm = ({ onTradeAdded = () => {} }) => {
   const { token } = useAuth();
+  const { draft, setDraft } = useTradeDraft();
 
-  const [form, setForm] = useState({
-    asset_class: "FX",
-    symbol: "",
-    direction: "BUY",
-    tradeDate: new Date().toISOString().slice(0, 16),
-    entryPrice: "",
-    stopLoss: "",
-    takeProfit: "",
-    lotSize: "",
-    timeframe: "H1",
-    strategy: "Scalping",
-    notes: "",
-    riskPercent: "",
-  });
+  const [form, setForm] = useState(defaultState);
+  const [error, setError] = useState("");
 
-  const [suggestedLot, setSuggestedLot] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleRiskCalc = async () => {
-    try {
-      setSuggestedLot(null);
-      const res = await fetch("/api/trades/risk-calc", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          balance: 10000, // مؤقتًا ثابت لحد ما نعمل Balance editable
-          riskPercent: parseFloat(form.riskPercent),
-          entryPrice: parseFloat(form.entryPrice),
-          stopLoss: parseFloat(form.stopLoss),
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Risk calc failed");
-      setSuggestedLot(data.suggestedLot);
-    } catch (e) {
-      setErr(e.message);
+  // لو فيه Draft من الـ Risk Calculator، املأ الحقول
+  useEffect(() => {
+    if (draft) {
+      setForm((prev) => ({
+        ...prev,
+        ...draft,
+        tradeDate: draft.tradeDate || new Date().toISOString(),
+      }));
+      // اختياري: امسح الدرافت بعد الملء
+      setDraft(null);
     }
+    // eslint-disable-next-line
+  }, [draft]);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (!token) return;
-
-    setLoading(true);
-    setErr("");
-
+    setError("");
     try {
       const res = await fetch("/api/trades", {
         method: "POST",
@@ -84,208 +59,96 @@ const AddTradeForm = ({ onSuccess }) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...form,
-          entryPrice: parseFloat(form.entryPrice),
-          stopLoss: form.stopLoss ? parseFloat(form.stopLoss) : null,
-          takeProfit: form.takeProfit ? parseFloat(form.takeProfit) : null,
-          lotSize: form.lotSize ? parseFloat(form.lotSize) : suggestedLot,
-          tradeDate: new Date(form.tradeDate).toISOString(),
-        }),
+        body: JSON.stringify(form),
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to add trade");
-
-      setForm({
-        asset_class: "FX",
-        symbol: "",
-        direction: "BUY",
-        tradeDate: new Date().toISOString().slice(0, 16),
-        entryPrice: "",
-        stopLoss: "",
-        takeProfit: "",
-        lotSize: "",
-        timeframe: "H1",
-        strategy: "Scalping",
-        notes: "",
-        riskPercent: "",
-      });
-      setSuggestedLot(null);
-
-      if (onSuccess) onSuccess();
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setLoading(false);
+      if (!res.ok) throw new Error(data.message || "Failed to create trade");
+      onTradeAdded(data);
+      setForm(defaultState);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-card text-card-fore border border-border rounded-xl p-4 space-y-3"
-    >
-      <div className="font-semibold">Add New Trade</div>
-      {err && <div className="text-sm text-red-500">{err}</div>}
+    <div className="p-4 bg-white border rounded">
+      <div className="mb-3 font-semibold">Add Trade</div>
+      {error && <div className="mb-2 text-red-600">{error}</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <select
-          name="asset_class"
-          value={form.asset_class}
-          onChange={handleChange}
-          className="p-2 border border-border rounded"
-        >
-          {Object.keys(SYMBOLS).map((cls) => (
-            <option key={cls} value={cls}>
-              {cls}
-            </option>
-          ))}
-        </select>
-
-        <select
-          name="symbol"
-          value={form.symbol}
-          onChange={handleChange}
-          required
-          className="p-2 border border-border rounded"
-        >
-          <option value="">Select Symbol</option>
-          {SYMBOLS[form.asset_class].map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-
-        <select
-          name="direction"
-          value={form.direction}
-          onChange={handleChange}
-          className="p-2 border border-border rounded"
-        >
-          <option value="BUY">BUY</option>
-          <option value="SELL">SELL</option>
-        </select>
-
-        <input
-          type="datetime-local"
-          name="tradeDate"
-          value={form.tradeDate}
-          onChange={handleChange}
-          className="p-2 border border-border rounded"
-        />
-
-        <input
-          type="number"
-          step="0.0001"
-          name="entryPrice"
-          value={form.entryPrice}
-          onChange={handleChange}
-          placeholder="Entry Price"
-          required
-          className="p-2 border border-border rounded"
-        />
-
-        <input
-          type="number"
-          step="0.0001"
-          name="stopLoss"
-          value={form.stopLoss}
-          onChange={handleChange}
-          placeholder="Stop Loss"
-          className="p-2 border border-border rounded"
-        />
-
-        <input
-          type="number"
-          step="0.0001"
-          name="takeProfit"
-          value={form.takeProfit}
-          onChange={handleChange}
-          placeholder="Take Profit"
-          className="p-2 border border-border rounded"
-        />
-
-        <input
-          type="number"
-          step="0.01"
-          name="lotSize"
-          value={form.lotSize}
-          onChange={handleChange}
-          placeholder="Lot Size (leave empty to use suggested)"
-          className="p-2 border border-border rounded"
-        />
-
-        <select
-          name="timeframe"
-          value={form.timeframe}
-          onChange={handleChange}
-          className="p-2 border border-border rounded"
-        >
-          {TIMEFRAMES.map((tf) => (
-            <option key={tf} value={tf}>
-              {tf}
-            </option>
-          ))}
-        </select>
-
-        <select
-          name="strategy"
-          value={form.strategy}
-          onChange={handleChange}
-          className="p-2 border border-border rounded"
-        >
-          {STRATEGIES.map((st) => (
-            <option key={st} value={st}>
-              {st}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="number"
-          step="0.1"
-          name="riskPercent"
-          value={form.riskPercent}
-          onChange={handleChange}
-          placeholder="Risk %"
-          className="p-2 border border-border rounded"
-        />
-
-        <textarea
-          name="notes"
-          value={form.notes}
-          onChange={handleChange}
-          placeholder="Notes"
-          className="p-2 border border-border rounded md:col-span-2"
-        />
-      </div>
-
-      {form.riskPercent && form.entryPrice && form.stopLoss && (
-        <button
-          type="button"
-          onClick={handleRiskCalc}
-          className="px-3 py-1 bg-muted rounded"
-        >
-          Calculate Suggested Lot
-        </button>
-      )}
-
-      {suggestedLot && (
-        <div className="text-sm opacity-80">
-          Suggested Lot: <b>{suggestedLot}</b>
+      <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="text-sm">Symbol</label>
+          <input name="symbol" value={form.symbol} onChange={onChange} className="w-full border rounded p-2"/>
         </div>
-      )}
 
-      <button
-        type="submit"
-        className="px-4 py-2 bg-primary text-white rounded-lg"
-        disabled={loading}
-      >
-        {loading ? "Saving..." : "Add Trade"}
-      </button>
-    </form>
+        <div>
+          <label className="text-sm">Asset</label>
+          <select name="asset_class" value={form.asset_class} onChange={onChange} className="w-full border rounded p-2">
+            <option>FX</option>
+            <option>Metals</option>
+            <option>Energy</option>
+            <option>Crypto</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm">Direction</label>
+          <select name="direction" value={form.direction} onChange={onChange} className="w-full border rounded p-2">
+            <option>BUY</option>
+            <option>SELL</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm">Trade Date</label>
+          <input type="datetime-local" name="tradeDate"
+            value={form.tradeDate ? new Date(form.tradeDate).toISOString().slice(0,16) : ""}
+            onChange={(e)=> setForm(f=>({...f, tradeDate: new Date(e.target.value).toISOString()}))}
+            className="w-full border rounded p-2"/>
+        </div>
+
+        <div>
+          <label className="text-sm">Entry</label>
+          <input type="number" step="0.00001" name="entryPrice" value={form.entryPrice} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div>
+          <label className="text-sm">Stop Loss</label>
+          <input type="number" step="0.00001" name="stopLoss" value={form.stopLoss || ""} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div>
+          <label className="text-sm">Take Profit</label>
+          <input type="number" step="0.00001" name="takeProfit" value={form.takeProfit || ""} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div>
+          <label className="text-sm">Lot Size</label>
+          <input type="number" step="0.01" name="lotSize" value={form.lotSize} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div>
+          <label className="text-sm">Timeframe</label>
+          <input name="timeframe" value={form.timeframe} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div>
+          <label className="text-sm">Strategy</label>
+          <input name="strategy" value={form.strategy} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div className="md:col-span-3">
+          <label className="text-sm">Notes</label>
+          <textarea name="notes" value={form.notes} onChange={onChange} className="w-full border rounded p-2"/>
+        </div>
+
+        <div className="md:col-span-3 mt-2">
+          <button type="submit" className="px-4 py-2 rounded bg-primary text-white">
+            Save Trade
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 

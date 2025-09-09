@@ -14,13 +14,14 @@ import Signup from "./pages/Signup";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SettingsProvider } from "./context/SettingsContext";
+import { TradeDraftProvider } from "./context/TradeDraftContext";
 
 // Protected Route wrapper
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loadingAuth } = useAuth();
 
   if (loadingAuth) {
-    return <div className="p-8">Loading...</div>; // لودينج مؤقت
+    return <div className="p-8">Loading...</div>;
   }
 
   return isAuthenticated ? children : <Navigate to="/login" replace />;
@@ -30,21 +31,23 @@ const App = () => {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <Router>
-          <Routes>
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Router>
+        <TradeDraftProvider>
+          <Router>
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </Router>
+        </TradeDraftProvider>
       </SettingsProvider>
     </AuthProvider>
   );

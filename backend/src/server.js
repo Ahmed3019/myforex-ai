@@ -5,24 +5,23 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-const app = require('./app');
-const { sequelize } = require('./config/db');
+require("dotenv").config();
+const { sequelize } = require("./models");
+const app = require("./app");
 
-// Sync DB and start server
-async function startServer() {
+const PORT = process.env.PORT || 4000;
+
+(async () => {
   try {
     await sequelize.authenticate();
-    console.log('✅ Database connection established successfully.');
-    await sequelize.sync();
-    console.log('✅ All models were synchronized successfully.');
+    console.log("✅ Database connection established successfully.");
 
-    const PORT = process.env.PORT || 4000; // << اشتغل على 4000
+    await sequelize.sync(); // sync models
+
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error('❌ Unable to connect to the database:', error);
+    console.error("❌ Unable to connect to the database:", error);
   }
-}
-
-startServer();
+})();
