@@ -6,13 +6,10 @@
  */
 const express = require("express");
 const auth = require("../middleware/auth");
-const UserCtrl = require("../controllers/user.controller");
+const Risk = require("../controllers/risk.controller");
 
 const router = express.Router();
 
-router.get("/settings", auth, UserCtrl.getSettings);
-router.put("/settings", auth, UserCtrl.updateSettings);
-router.get("/balance",  auth, UserCtrl.getBalance);
-router.put("/balance",  auth, UserCtrl.updateBalance);
+router.post("/calc", auth, Risk.calc);
 
 module.exports = router;

@@ -4,7 +4,6 @@
  * Tel: 01558547000
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -15,7 +14,6 @@ const box   = "bg-white border rounded p-4";
 export default function RiskCalculatorPanel({ onSendToAddTrade }) {
   const { token } = useAuth();
 
-  // form state
   const [symbol, setSymbol] = useState("EURUSD");
   const [entryPrice, setEntryPrice] = useState("");
   const [stopLoss, setStopLoss] = useState("");
@@ -24,16 +22,13 @@ export default function RiskCalculatorPanel({ onSendToAddTrade }) {
   const [lotSize, setLotSize] = useState("");
   const [quoteToUSDRate, setQuoteToUSDRate] = useState("");
 
-  // meta from backend
   const [timeframes, setTimeframes] = useState([]);
   const [strategies, setStrategies] = useState([]);
   const [pairs, setPairs] = useState(null);
 
-  // result
   const [result, setResult] = useState(null);
   const [err, setErr] = useState("");
 
-  // fetch meta (timeframes, strategies, pairs)
   useEffect(() => {
     const run = async () => {
       try {
@@ -71,7 +66,6 @@ export default function RiskCalculatorPanel({ onSendToAddTrade }) {
   const needsConversionHint = useMemo(() => {
     if (!symbol) return false;
     const base = symbol.slice(0,3), quote = symbol.slice(3);
-    // محتاج conversion لو لا يبدأ ولا ينتهي بـ USD
     return !(quote === "USD" || base === "USD");
   }, [symbol]);
 
@@ -117,7 +111,6 @@ export default function RiskCalculatorPanel({ onSendToAddTrade }) {
       lotSize: Number(lots.toFixed(2)),
       timeframe: timeframes?.[0] || "H1",
       strategy: strategies?.[0] || "Scalping",
-      // ماندخلش SL/TP هنا إلا لو هتستخدمها فى الـ AddTrade (اختياري)
     });
   };
 
@@ -161,10 +154,8 @@ export default function RiskCalculatorPanel({ onSendToAddTrade }) {
         {needsConversionHint && (
           <div className="md:col-span-3">
             <div className={label}>Quote→USD rate (for crosses)</div>
-            <input className={field} value={quoteToUSDRate} onChange={(e)=>setQuoteToUSDRate(e.target.value)} placeholder="e.g. GBPUSD=1.27 ⇒ 1.27" />
-            <div className="text-xs text-amber-600 mt-1">
-              Cross pair detected. Provide quote→USD rate temporarily (Phase 3 will auto-convert).
-            </div>
+            <input className={field} value={quoteToUSDRate} onChange={(e)=>setQuoteToUSDRate(e.target.value)} placeholder="e.g. 1.27" />
+            <div className="text-xs text-amber-600 mt-1">Cross pair detected. Provide quote→USD rate temporarily.</div>
           </div>
         )}
       </div>

@@ -3,84 +3,105 @@
  * Mail: ahmedsalama3014@gmail.com
  * Tel: 01558547000
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
- *
- * P/L math:
- *   pips = (exit - entry) / pipSize * (BUY ? +1 : -1)
- *   PL(USD) = pips * pipValuePerLotUSD(symbol, price) * lotSize
  */
 
-const FX_CONTRACT_SIZE = 100000;   // 1 standard lot
-const GOLD_CONTRACT_SIZE = 100;    // XAUUSD 1 lot = 100 oz
-const SILVER_CONTRACT_SIZE = 5000; // XAGUSD 1 lot = 5000 oz
-const WTI_CONTRACT_SIZE = 1000;    // 1 lot = 1000 barrels
+const {
+  FX_MAJORS, FX_MINORS, FX_EXOTICS, METALS, ENERGY, CRYPTO,
+  flatPairs
+} = require("../utils/symbols");
 
-const SYMBOL_SPECS = {
-  // FX (quote USD)
-  EURUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-  GBPUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-  AUDUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-  NZDUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-
-  // JPY / others (dynamic)
-  USDJPY: { asset: "FX", pipSize: 0.01, contractSize: FX_CONTRACT_SIZE, quote: "JPY" },
-  EURJPY: { asset: "FX", pipSize: 0.01, contractSize: FX_CONTRACT_SIZE, quote: "JPY" },
-  GBPJPY: { asset: "FX", pipSize: 0.01, contractSize: FX_CONTRACT_SIZE, quote: "JPY" },
-  USDCHF: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "CHF" },
-  USDCAD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "CAD" },
-
-  // Metals
-  XAUUSD: { asset: "Metals", pipSize: 0.01, contractSize: GOLD_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 1 },
-  XAGUSD: { asset: "Metals", pipSize: 0.01, contractSize: SILVER_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 50 },
-
-  // Energy
-  WTI:    { asset: "Energy", pipSize: 0.01, contractSize: WTI_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-
-  // Crypto (assumptions)
-  BTCUSD: { asset: "Crypto", pipSize: 0.01, contractSize: 1, quote: "USD", pipFixedUSD: 1 },
-  ETHUSD: { asset: "Crypto", pipSize: 0.01, contractSize: 10, quote: "USD", pipFixedUSD: 0.1 },
-};
-
-function getSpec(symbol) {
-  const key = (symbol || "").toUpperCase();
-  return (
-    SYMBOL_SPECS[key] || { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 }
-  );
+/** ابحث عن تعريف الزوج/الأصل */
+function findSymbolMeta(symbol) {
+  const all = flatPairs();
+  return all.find((s) => s.symbol === symbol);
 }
 
-function calcPips(symbol, entry, exit, direction) {
-  const { pipSize } = getSpec(symbol);
-  const sign = direction === "SELL" ? -1 : 1;
-  const pips = ((exit - entry) / pipSize) * sign;
-  return Number(pips.toFixed(2));
+/** احسب عدد النقاط (pips) حسب pipSize */
+function pipsBetween(a, b, pipSize) {
+  const diff = Math.abs(parseFloat(a) - parseFloat(b));
+  return diff / pipSize;
 }
 
-function pipValuePerLotUSD(symbol, price) {
-  const spec = getSpec(symbol);
-  if (spec.pipFixedUSD) return spec.pipFixedUSD;
-  if (!price || price <= 0) return 9; // fallback
-  const usdVal = (spec.contractSize * spec.pipSize) / price;
-  return Number(usdVal.toFixed(6));
+/**
+ * احسب قيمة النقطة للوت واحد (USD per pip per 1 Lot)
+ * قواعد مبسطة (حساب بالدولار):
+ * - لو الزوج بينتهي بـ USD (EURUSD, GBPUSD, XAUUSD, WTIUSD ..): pipValue = contractSize * pipSize
+ * - لو بيبدأ بـ USD (USDJPY): pipValue = (contractSize * pipSize) / price
+ * - لو Cross (لا يبدأ ولا ينتهي بـ USD) زي EURGBP, EURJPY:
+ *     نحتاج "quoteToUSDRate" = سعر تحويل عملة الـ quote إلى USD (مثلاً GBPUSD، أو USDJPY -> نستخدم 1/USDJPY)
+ *     pipValueUSD = contractSize * pipSize * quoteToUSDRate
+ */
+function pipValuePerLotUSD({ symbol, price, quoteToUSDRate }) {
+  const meta = findSymbolMeta(symbol);
+  if (!meta) throw new Error(`Unknown symbol meta for ${symbol}`);
+
+  const { pipSize, contractSize, asset_class } = meta;
+
+  const base = symbol.slice(0, 3);
+  const quote = symbol.slice(3);
+
+  // أصول مسعّرة بالدولار مباشرة (الكثير منها سينطبق عليه rule endsWith USD)
+  if (quote === "USD") {
+    return contractSize * pipSize; // مثال EURUSD -> 100000 * 0.0001 = 10 USD
+  }
+
+  // أزواج تبدأ بـ USD (USDJPY مثلاً)
+  if (base === "USD") {
+    if (!price) throw new Error("price is required to compute pip value for USD-base pairs");
+    return (contractSize * pipSize) / parseFloat(price); // ~ 1000/price
+  }
+
+  // Crosses: EURGBP, EURJPY, ...
+  // نحتاج تحويل عملة الـ quote إلى USD
+  if (quoteToUSDRate && !isNaN(parseFloat(quoteToUSDRate))) {
+    return contractSize * pipSize * parseFloat(quoteToUSDRate);
+  }
+
+  // مفيش conversion → رجّع null (الـ FE ممكن يطلب conversion مؤقتًا لحد Phase 3 live prices)
+  return null;
 }
 
-function calcPL_USD({ symbol, direction, entryPrice, exitPrice, lotSize }) {
-  const entry = Number(entryPrice);
-  const exit = Number(exitPrice);
-  const lots = Number(lotSize);
+/** الهامش المطلوب (Margin) بالدولار التقريبي */
+function requiredMarginUSD({ symbol, entryPrice, leverage, lots }) {
+  const meta = findSymbolMeta(symbol);
+  if (!meta) throw new Error(`Unknown symbol meta for ${symbol}`);
 
-  const pips = calcPips(symbol, entry, exit, direction);
-  const pipVal = pipValuePerLotUSD(symbol, exit || entry || 1);
-  const pl = pips * pipVal * lots;
+  const { contractSize } = meta;
+  const base = symbol.slice(0, 3);
+  const quote = symbol.slice(3);
 
-  return {
-    pips: Number(pips.toFixed(2)),
-    pipValuePerLotUSD: Number(pipVal.toFixed(6)),
-    plUSD: Number(pl.toFixed(5)),
-  };
+  // تقدير بسيط:
+  // - لو المسعّر بالدولار (quote USD) أو الذهب…: margin = entryPrice * contractSize * lots / leverage
+  // - لو USD في البداية (USDJPY): نستخدم نفس المعادلة (النتيجة بالدولار تقريبًا)
+  // - لو Cross: نحتاج تحويل، هنرجّع null مؤقتًا.
+  if (quote === "USD" || base === "USD") {
+    return (parseFloat(entryPrice) * contractSize * parseFloat(lots)) / parseFloat(leverage);
+  }
+  return null;
+}
+
+/** احسب P/L بالدولار بناءً على pips وقيمة النقطة */
+function computePLUSD({ symbol, entryPrice, exitPrice, lotSize, quoteToUSDRate }) {
+  const meta = findSymbolMeta(symbol);
+  if (!meta) throw new Error(`Unknown symbol meta for ${symbol}`);
+
+  const { pipSize } = meta;
+  const pips = pipsBetween(entryPrice, exitPrice, pipSize);
+
+  const pv = pipValuePerLotUSD({ symbol, price: entryPrice, quoteToUSDRate });
+  if (pv === null) {
+    return { plUSD: null, pips, pipValuePerLotUSD: null }; // محتاج conversion
+  }
+
+  // اتجاه الصفقة لازم يتحدد برّه (BUY/SELL)
+  const raw = pips * pv * parseFloat(lotSize);
+  return { plUSD: raw, pips, pipValuePerLotUSD: pv };
 }
 
 module.exports = {
-  getSpec,
-  calcPips,
+  findSymbolMeta,
+  pipsBetween,
   pipValuePerLotUSD,
-  calcPL_USD,
+  requiredMarginUSD,
+  computePLUSD,
 };

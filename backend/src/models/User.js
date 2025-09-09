@@ -1,31 +1,38 @@
+// backend/src/models/User.js
 const { Sequelize } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define(
     "User",
     {
-      id: {
+      id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+      username: { type: DataTypes.STRING(50), allowNull: false, unique: true },
+      email: { type: DataTypes.STRING(100), allowNull: false, unique: true },
+      password: { type: DataTypes.STRING(100), allowNull: false },
+      balance: { type: DataTypes.DECIMAL(15, 2), defaultValue: 100.0 },
+
+      // Settings (تخزين بأسماء snake_case + تعريض بـ camelCase)
+      baseCurrency: {
+        type: DataTypes.STRING(10),
+        allowNull: true,
+        defaultValue: "USD",
+        field: "base_currency",
+      },
+      defaultLeverage: {
         type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
+        allowNull: true,
+        defaultValue: 100,
+        field: "default_leverage",
       },
-      username: {
-        type: DataTypes.STRING(50),
-        allowNull: false,
-        unique: true,
+      timezone: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        defaultValue: "Africa/Cairo",
       },
-      email: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-        unique: true,
-      },
-      password: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-      },
-      balance: {
-        type: DataTypes.DECIMAL(15, 2),
-        defaultValue: 10000.0,
+      theme: {
+        type: DataTypes.STRING(10),
+        allowNull: true,
+        defaultValue: "light",
       },
     },
     {
@@ -35,5 +42,6 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: "updated_at",
     }
   );
+
   return User;
 };

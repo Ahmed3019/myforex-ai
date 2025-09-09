@@ -5,110 +5,140 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-import React, { useEffect, useState, useCallback } from "react";
-import TradesTable from "../trades/TradesTable";
-import AddTradeForm from "../trades/AddTradeForm";
-import EditTradeModal from "../trades/EditTradeModal";
-import CloseTradeModal from "../trades/CloseTradeModal";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import AddTradeForm from "../forms/AddTradeForm";
+import RiskCalculatorPanel from "../panels/RiskCalculatorPanel";
 
-const TradesTab = () => {
+const box = "bg-white border rounded p-4";
+const th  = "px-3 py-2 text-left text-xs font-semibold text-gray-500";
+const td  = "px-3 py-2 text-sm";
+
+export default function TradesTab() {
   const { token } = useAuth();
   const [trades, setTrades] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [prefill, setPrefill] = useState(null);
   const [err, setErr] = useState("");
-  const [editTrade, setEditTrade] = useState(null);
-  const [closeTrade, setCloseTrade] = useState(null);
 
-  const fetchTrades = useCallback(async () => {
-    if (!token) return;
+  const load = async () => {
     setLoading(true);
     setErr("");
     try {
       const res = await fetch("/api/trades", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Failed to load trades");
-      }
       const data = await res.json();
-      setTrades(Array.isArray(data) ? data : []);
+      if (!res.ok) throw new Error(data.message || "Failed to fetch trades");
+      setTrades(data);
     } catch (e) {
       setErr(e.message);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  };
 
-  useEffect(() => {
-    fetchTrades();
-  }, [fetchTrades]);
+  useEffect(() => { if (token) load(); }, [token]);
 
-  const handleDelete = async (trade) => {
-    if (!window.confirm("Delete this trade?")) return;
+  const closeTrade = async (id) => {
+    const exit = prompt("Exit price?");
+    if (!exit) return;
     try {
-      await fetch(`/api/trades/${trade.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`/api/trades/${id}/close`, {
+        method: "PUT",
+        headers: { "Content-Type":"application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ exitPrice: Number(exit) })
       });
-      fetchTrades();
-    } catch (e) {
-      alert(e.message);
-    }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to close trade");
+      await load();
+    } catch (e) { alert(e.message); }
+  };
+
+  const delTrade = async (id) => {
+    if (!window.confirm("Delete trade?")) return;
+    try {
+      const res = await fetch(`/api/trades/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to delete trade");
+      await load();
+    } catch (e) { alert(e.message); }
   };
 
   return (
-    <div className="space-y-4">
-      <AddTradeForm onSuccess={fetchTrades} />
+    <div className="grid gap-4">
+      <RiskCalculatorPanel onSendToAddTrade={(payload) => setPrefill(payload)} />
 
-      <div className="flex items-center justify-between">
-        <div className="font-semibold">Trades</div>
-        <button
-          onClick={fetchTrades}
-          className="px-3 py-2 rounded-lg bg-muted"
-          disabled={loading}
-        >
-          {loading ? "Loading..." : "Refresh"}
-        </button>
+      <AddTradeForm prefill={prefill} onTradeAdded={load} />
+
+      <div className={box}>
+        <div className="font-semibold mb-3">Trades</div>
+        {err && <div className="text-red-600">{err}</div>}
+        {loading ? (
+          <div>Loading...</div>
+        ) : (
+          <div className="overflow-auto max-h-[55vh]">
+            <table className="min-w-full">
+              <thead className="sticky top-0 bg-gray-50">
+                <tr>
+                  <th className={th}>ID</th>
+                  <th className={th}>Symbol</th>
+                  <th className={th}>Asset</th>
+                  <th className={th}>Direction</th>
+                  <th className={th}>Entry</th>
+                  <th className={th}>Exit</th>
+                  <th className={th}>SL</th>
+                  <th className={th}>TP</th>
+                  <th className={th}>Lot</th>
+                  <th className={th}>Timeframe</th>
+                  <th className={th}>Strategy</th>
+                  <th className={th}>P/L</th>
+                  <th className={th}>Status</th>
+                  <th className={th}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trades.map((t) => (
+                  <tr key={t.id} className="border-t">
+                    <td className={td}>{t.id}</td>
+                    <td className={td}>{t.symbol}</td>
+                    <td className={td}>{t.asset_class}</td>
+                    <td className={td}>{t.direction}</td>
+                    <td className={td}>{number5(t.entryPrice)}</td>
+                    <td className={td}>{t.exitPrice != null ? number5(t.exitPrice) : "-"}</td>
+                    <td className={td}>{t.stopLoss != null ? number5(t.stopLoss) : "-"}</td>
+                    <td className={td}>{t.takeProfit != null ? number5(t.takeProfit) : "-"}</td>
+                    <td className={td}>{t.lotSize}</td>
+                    <td className={td}>{t.timeframe || "-"}</td>
+                    <td className={td}>{t.strategy || "-"}</td>
+                    <td className={td}>{t.profitLoss != null ? number5(t.profitLoss) : "-"}</td>
+                    <td className={td}>{t.isClosed ? "Closed" : "Open"}</td>
+                    <td className={td}>
+                      {!t.isClosed && (
+                        <button onClick={() => closeTrade(t.id)} className="px-2 py-1 text-sm rounded bg-blue-600 text-white mr-2">Close</button>
+                      )}
+                      <button onClick={() => delTrade(t.id)} className="px-2 py-1 text-sm rounded bg-red-600 text-white">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+                {!trades.length && (
+                  <tr><td className="px-3 py-8 text-center text-gray-400" colSpan={14}>No trades yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      {err && (
-        <div className="bg-card border border-border rounded-lg p-3 text-red-500 text-sm">
-          {err}
-        </div>
-      )}
-
-      <TradesTable
-        trades={trades}
-        onEdit={setEditTrade}
-        onClose={setCloseTrade}
-        onDelete={handleDelete}
-      />
-
-      {editTrade && (
-        <EditTradeModal
-          trade={editTrade}
-          onClose={() => setEditTrade(null)}
-          onSaved={() => {
-            setEditTrade(null);
-            fetchTrades();
-          }}
-        />
-      )}
-
-      {closeTrade && (
-        <CloseTradeModal
-          trade={closeTrade}
-          onClose={() => setCloseTrade(null)}
-          onSaved={() => {
-            setCloseTrade(null);
-            fetchTrades();
-          }}
-        />
-      )}
     </div>
   );
-};
+}
 
-export default TradesTab;
+function number5(v) {
+  if (v === null || v === undefined) return "-";
+  const n = typeof v === "string" ? Number(v) : v;
+  if (Number.isNaN(n)) return "-";
+  return n.toFixed(5);
+}

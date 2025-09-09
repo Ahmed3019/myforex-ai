@@ -4,7 +4,6 @@
  * Tel: 01558547000
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -53,7 +52,6 @@ export default function AddTradeForm({ onTradeAdded, prefill }) {
     run();
   }, []);
 
-  // لو جالك prefill وقت التشغيل (من Risk Calculator)
   useEffect(() => {
     if (!prefill) return;
     if (prefill.symbol) setSymbol(prefill.symbol);
@@ -89,7 +87,6 @@ export default function AddTradeForm({ onTradeAdded, prefill }) {
 
       setOk("Trade added.");
       if (onTradeAdded) onTradeAdded();
-      // reset optional only
       setNotes("");
     } catch(e){
       setErr(e.message);

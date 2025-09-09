@@ -4,30 +4,12 @@
  * Tel: 01558547000
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
-
 const express = require("express");
 const { Trade, User } = require("../models");
 const auth = require("../middleware/auth");
-const { calcPL_USD } = require("../utils/calc");
+const { findSymbolMeta, pipsBetween, pipValuePerLotUSD } = require("../utils/calc");
 
 const router = express.Router();
-
-async function buildStats(userId) {
-  const all = await Trade.findAll({ where: { userId } });
-  const totalTrades = all.length;
-  const closedTrades = all.filter((t) => t.isClosed).length;
-  const openTrades = totalTrades - closedTrades;
-  const totalProfit = parseFloat(
-    all.reduce((s, t) => s + (parseFloat(t.profitLoss) || 0), 0).toFixed(5)
-  );
-  const winRate = closedTrades
-    ? parseFloat(
-        ((all.filter((t) => parseFloat(t.profitLoss) > 0).length / closedTrades) * 100).toFixed(2)
-      )
-    : 0;
-
-  return { totalTrades, openTrades, closedTrades, totalProfit, winRate };
-}
 
 // Get all trades
 router.get("/", auth, async (req, res) => {
@@ -65,47 +47,70 @@ router.put("/:id", auth, async (req, res) => {
   }
 });
 
-// Close trade (compute P/L + update balance + stats)
+// Close trade (P/L بالنقاط + تحديث الرصيد + إرجاع stats)
 router.put("/:id/close", auth, async (req, res) => {
   try {
-    const { exitPrice } = req.body;
+    const { exitPrice, quoteToUSDRate } = req.body;
     if (exitPrice === undefined || exitPrice === null || exitPrice === "")
       return res.status(400).json({ message: "exitPrice is required" });
 
-    const exit = parseFloat(exitPrice);
-    if (Number.isNaN(exit))
-      return res.status(400).json({ message: "exitPrice must be a number" });
-
-    const trade = await Trade.findOne({
-      where: { id: req.params.id, userId: req.user.id },
-    });
+    const trade = await Trade.findOne({ where: { id: req.params.id, userId: req.user.id } });
     if (!trade) return res.status(404).json({ message: "Trade not found" });
 
-    const entry = parseFloat(trade.entryPrice);
-    const lots = parseFloat(trade.lotSize);
+    const meta = findSymbolMeta(trade.symbol);
+    if (!meta) return res.status(400).json({ message: "Unknown symbol meta" });
 
-    const { plUSD } = calcPL_USD({
-      symbol: trade.symbol,
-      direction: trade.direction,
-      entryPrice: entry,
-      exitPrice: exit,
-      lotSize: lots,
-    });
+    const entry = parseFloat(trade.entryPrice);
+    const exit  = parseFloat(exitPrice);
+    const lot   = parseFloat(trade.lotSize);
+    const sign  = trade.direction === "BUY" ? 1 : -1;
+
+    const pips = pipsBetween(entry, exit, meta.pipSize);
+    const pv   = pipValuePerLotUSD({ symbol: trade.symbol, price: entry, quoteToUSDRate });
+
+    if (pv === null) {
+      // محتاج conversion لغاية Phase 3
+      return res.status(400).json({
+        message: "quoteToUSDRate required for non-USD crosses until live prices are added",
+      });
+    }
+
+    // P/L بالدولار (مع الاتجاه)
+    const profitLoss = parseFloat((sign * pips * pv * lot).toFixed(5));
 
     trade.exitPrice = exit;
-    trade.isClosed = true;
-    trade.profitLoss = plUSD; // 5 decimals
+    trade.isClosed  = true;
+    trade.profitLoss = profitLoss;
     await trade.save();
 
+    // تحديث الرصيد (خانتا عشرية)
     const user = await User.findByPk(req.user.id);
-    user.balance = parseFloat((parseFloat(user.balance) + plUSD).toFixed(2));
+    const currentBalance = parseFloat(user.balance);
+    user.balance = parseFloat((currentBalance + profitLoss).toFixed(2));
     await user.save();
 
-    const stats = await buildStats(req.user.id);
-    res.json({ trade, balance: user.balance, stats });
+    // stats
+    const all = await Trade.findAll({ where: { userId: req.user.id } });
+    const totalTrades = all.length;
+    const closedTrades = all.filter((t) => t.isClosed).length;
+    const openTrades = totalTrades - closedTrades;
+    const totalProfit = parseFloat(
+      all.reduce((s, t) => s + (parseFloat(t.profitLoss) || 0), 0).toFixed(5)
+    );
+    const winRate = closedTrades
+      ? parseFloat(
+          ((all.filter((t) => parseFloat(t.profitLoss) > 0).length / closedTrades) * 100).toFixed(2)
+        )
+      : 0;
+
+    res.json({
+      trade,
+      balance: user.balance,
+      stats: { totalTrades, openTrades, closedTrades, totalProfit, winRate },
+    });
   } catch (err) {
     console.error("Close trade error:", err);
-    res.status(500).json({ message: "Failed to close trade", error: err.message });
+    res.status(500).json({ message: "Failed to close trade" });
   }
 });
 
@@ -126,8 +131,21 @@ router.delete("/:id", auth, async (req, res) => {
 // Stats
 router.get("/stats/all", auth, async (req, res) => {
   try {
-    const stats = await buildStats(req.user.id);
-    res.json(stats);
+    const trades = await Trade.findAll({ where: { userId: req.user.id } });
+    const totalTrades = trades.length;
+    const closedTrades = trades.filter((t) => t.isClosed).length;
+    const openTrades = totalTrades - closedTrades;
+    const totalProfit = parseFloat(
+      trades.reduce((sum, t) => sum + (parseFloat(t.profitLoss) || 0), 0).toFixed(5)
+    );
+    const winRate =
+      closedTrades > 0
+        ? parseFloat(
+            ((trades.filter((t) => parseFloat(t.profitLoss) > 0).length / closedTrades) * 100).toFixed(2)
+          )
+        : 0;
+
+    res.json({ totalTrades, openTrades, closedTrades, totalProfit, winRate });
   } catch (err) {
     console.error("Stats error:", err);
     res.status(500).json({ message: "Failed to fetch stats" });
