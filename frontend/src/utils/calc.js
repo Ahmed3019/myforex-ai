@@ -5,81 +5,125 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-const FX_CONTRACT_SIZE = 100000;   // 1 standard lot
-const GOLD_CONTRACT_SIZE = 100;    // XAUUSD 1 lot = 100 oz
-const SILVER_CONTRACT_SIZE = 5000; // XAGUSD 1 lot = 5000 oz
-const WTI_CONTRACT_SIZE = 1000;    // 1 lot = 1000 barrels
-
+// Basic specs per symbol for pip calculation & contract sizes
+// pipSize = minimum price move considered 1 pip for that market
+// contractSize used for metals/energy/crypto approximations where needed
 export const SYMBOL_SPECS = {
-  // FX (quote USD) -> pip value ثابت 10$ لكل 1 Lot و 1 pip
-  EURUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-  GBPUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-  AUDUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
-  NZDUSD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
+  // FX Majors
+  EURUSD: { asset: "FX", quote: "USD", pipSize: 0.0001, contractSize: 100000 },
+  GBPUSD: { asset: "FX", quote: "USD", pipSize: 0.0001, contractSize: 100000 },
+  USDJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
+  USDCHF: { asset: "FX", quote: "CHF", pipSize: 0.0001, contractSize: 100000 },
+  USDCAD: { asset: "FX", quote: "CAD", pipSize: 0.0001, contractSize: 100000 },
+  AUDUSD: { asset: "FX", quote: "USD", pipSize: 0.0001, contractSize: 100000 },
+  NZDUSD: { asset: "FX", quote: "USD", pipSize: 0.0001, contractSize: 100000 },
 
-  // JPY وأزواج تانية (pip value ديناميكي = contract*pipSize/price)
-  USDJPY: { asset: "FX", pipSize: 0.01,   contractSize: FX_CONTRACT_SIZE, quote: "JPY" },
-  EURJPY: { asset: "FX", pipSize: 0.01,   contractSize: FX_CONTRACT_SIZE, quote: "JPY" },
-  GBPJPY: { asset: "FX", pipSize: 0.01,   contractSize: FX_CONTRACT_SIZE, quote: "JPY" },
-  USDCHF: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "CHF" },
-  USDCAD: { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "CAD" },
+  // FX Minors / Crosses
+  EURJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
+  GBPJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
+  EURGBP: { asset: "FX", quote: "GBP", pipSize: 0.0001, contractSize: 100000 },
+  EURCHF: { asset: "FX", quote: "CHF", pipSize: 0.0001, contractSize: 100000 },
+  EURCAD: { asset: "FX", quote: "CAD", pipSize: 0.0001, contractSize: 100000 },
+  EURNZD: { asset: "FX", quote: "NZD", pipSize: 0.0001, contractSize: 100000 },
+  EURAUD: { asset: "FX", quote: "AUD", pipSize: 0.0001, contractSize: 100000 },
+  GBPAUD: { asset: "FX", quote: "AUD", pipSize: 0.0001, contractSize: 100000 },
+  GBPCAD: { asset: "FX", quote: "CAD", pipSize: 0.0001, contractSize: 100000 },
+  GBPCHF: { asset: "FX", quote: "CHF", pipSize: 0.0001, contractSize: 100000 },
+  AUDJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
+  CADJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
+  CHFJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
+  NZDJPY: { asset: "FX", quote: "JPY", pipSize: 0.01,   contractSize: 100000 },
 
   // Metals
-  XAUUSD: { asset: "Metals", pipSize: 0.01, contractSize: GOLD_CONTRACT_SIZE,  quote: "USD", pipFixedUSD: 1 },
-  XAGUSD: { asset: "Metals", pipSize: 0.01, contractSize: SILVER_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 50 },
+  XAUUSD: { asset: "Metals", quote: "USD", pipSize: 0.01, contractSize: 100 },   // 1 lot = 100 oz
+  XAGUSD: { asset: "Metals", quote: "USD", pipSize: 0.01, contractSize: 5000 },  // 1 lot = 5000 oz
 
   // Energy
-  WTI:    { asset: "Energy", pipSize: 0.01, contractSize: WTI_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 },
+  WTI:    { asset: "Energy", quote: "USD", pipSize: 0.01, contractSize: 1000 },  // 1 lot = 1000 barrels
 
-  // Crypto (افتراضات شائعة)
-  BTCUSD: { asset: "Crypto", pipSize: 0.01, contractSize: 1,  quote: "USD", pipFixedUSD: 1 },
-  ETHUSD: { asset: "Crypto", pipSize: 0.01, contractSize: 10, quote: "USD", pipFixedUSD: 0.1 },
+  // Crypto (assumption contract sizes; vary by broker)
+  BTCUSD: { asset: "Crypto", quote: "USD", pipSize: 0.01, contractSize: 1 },     // 1 lot = 1 BTC
+  ETHUSD: { asset: "Crypto", quote: "USD", pipSize: 0.01, contractSize: 10 },    // 1 lot = 10 ETH (example)
 };
 
-export function getSpec(symbol) {
-  const key = (symbol || "").toUpperCase();
-  return (
-    SYMBOL_SPECS[key] || { asset: "FX", pipSize: 0.0001, contractSize: FX_CONTRACT_SIZE, quote: "USD", pipFixedUSD: 10 }
-  );
-}
+// Grouping for UI dropdowns
+export const GROUPS = {
+  FX_Majors: ["EURUSD","GBPUSD","AUDUSD","NZDUSD","USDJPY","USDCHF","USDCAD"],
+  FX_Crosses: ["EURJPY","GBPJPY","EURGBP","EURAUD","EURNZD","EURCHF","EURCAD","GBPAUD","GBPCAD","GBPCHF","AUDJPY","CADJPY","CHFJPY","NZDJPY"],
+  Metals: ["XAUUSD","XAGUSD"],
+  Energy: ["WTI"],
+  Crypto: ["BTCUSD","ETHUSD"],
+};
 
-export function calcPips(symbol, entry, otherPrice) {
+// Fallback spec getter
+export const getSpec = (symbol) => SYMBOL_SPECS[symbol] || { asset: "FX", quote: "USD", pipSize: 0.0001, contractSize: 100000 };
+
+// Pip calc (in pips)
+export const calcPips = (symbol, entry, price) => {
+  if (!entry || !price) return 0;
   const { pipSize } = getSpec(symbol);
-  if (!entry || !otherPrice) return 0;
-  const pips = Math.abs((Number(otherPrice) - Number(entry)) / pipSize);
-  return Number(pips.toFixed(2));
-}
+  return Math.abs((Number(price) - Number(entry)) / pipSize);
+};
 
-export function pipValuePerLotUSD(symbol, priceOrEntry) {
+// Pip value per 1 lot in USD (approx)
+export const pipValuePerLotUSD = (symbol, price = 1) => {
   const spec = getSpec(symbol);
-  if (spec.pipFixedUSD) return spec.pipFixedUSD;
-  const price = Number(priceOrEntry) || 1;
-  const usdVal = (spec.contractSize * spec.pipSize) / price;
-  return Number(usdVal.toFixed(6));
-}
+  // For most USD-quoted pairs (EURUSD, GBPUSD...) pip value per 1 lot ~ $10
+  if (spec.asset === "FX") {
+    if (spec.quote === "USD") return 10;
+    if (spec.quote === "JPY") {
+      // ~ (100000 * pipSize) / price -> e.g., USDJPY ~ 100000*0.01/price
+      return (spec.contractSize * spec.pipSize) / Number(price || 1);
+    }
+    // Non-USD quotes (rough approximation in USD)
+    return 10; // simplification
+  }
+  if (spec.asset === "Metals") {
+    // XAU: 1 lot = 100 oz, tick=0.01, assume $1 per 0.01 per lot -> $1 per pip per lot
+    if (symbol === "XAUUSD") return 1;
+    // XAG: 5000 oz, tick=0.01 -> $50 per pip per lot
+    if (symbol === "XAGUSD") return 50;
+  }
+  if (spec.asset === "Energy") {
+    // WTI: 1000 barrels, tick=0.01 -> $10 per pip per lot
+    return 10;
+  }
+  if (spec.asset === "Crypto") {
+    // Highly broker-dependent; approximate: BTCUSD (1 lot=1 BTC) -> $1 per 0.01 ($0.01 pip) => $1 per pip
+    if (symbol === "BTCUSD") return 1;
+    if (symbol === "ETHUSD") return 0.1; // example for 10 ETH lot
+  }
+  return 10;
+};
 
-/**
- * lotSize = (riskAmount) / (pips * pipValuePerLotUSD)
- * riskAmount = balance * (risk%/100)
- */
-export function suggestLotSize({ symbol, entry, sl, balance, riskPercent }) {
-  const pips = calcPips(symbol, entry, sl);
-  if (!pips || !balance || !riskPercent) return { pips: 0, pipVal: 0, lot: 0, riskAmount: 0 };
-  const pipVal = pipValuePerLotUSD(symbol, entry);
-  const riskAmount = Number(balance) * (Number(riskPercent) / 100);
+// Suggested lot size (risk %) given SL distance
+export const suggestLotSize = ({ symbol, entry, sl, balance, riskPercent }) => {
+  const e = Number(entry);
+  const s = Number(sl);
+  const bal = Number(balance);
+  const r = Number(riskPercent);
+  if (!e || !s || !bal || !r) return { lot: 0, riskAmount: 0 };
+
+  const pips = calcPips(symbol, e, s);
+  if (pips <= 0) return { lot: 0, riskAmount: 0 };
+
+  const pipVal = pipValuePerLotUSD(symbol, e);
+  const riskAmount = (bal * r) / 100;
   const lot = riskAmount / (pips * pipVal);
-  return {
-    pips,
-    pipVal: Number(pipVal.toFixed(6)),
-    riskAmount: Number(riskAmount.toFixed(2)),
-    lot: Number(lot.toFixed(2)),
-  };
-}
+  return { lot, riskAmount };
+};
 
-export function rrTargets({ direction, entry, sl, rr = 2 }) {
-  const e = Number(entry), s = Number(sl);
-  if (!e || !s) return { rr, tp: null };
-  const riskPerUnit = Math.abs(e - s);
-  const tp = direction === "BUY" ? e + rr * riskPerUnit : e - rr * riskPerUnit;
-  return { rr, tp: Number(tp.toFixed(5)) };
-}
+// RR → TP price suggestion
+export const rrTargets = ({ direction, entry, sl, rr }) => {
+  const e = Number(entry);
+  const s = Number(sl);
+  const R = Number(rr || 2);
+  if (!e || !s) return { tp: null };
+
+  const diff = Math.abs(e - s);
+  if (direction === "BUY") {
+    return { tp: e + diff * R };
+  } else {
+    return { tp: e - diff * R };
+  }
+};

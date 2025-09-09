@@ -11,7 +11,6 @@ const TradeDraftContext = createContext(null);
 
 export const TradeDraftProvider = ({ children }) => {
   const [draft, setDraft] = useState(null);
-
   return (
     <TradeDraftContext.Provider value={{ draft, setDraft }}>
       {children}

@@ -16,14 +16,9 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { TradeDraftProvider } from "./context/TradeDraftContext";
 
-// Protected Route wrapper
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loadingAuth } = useAuth();
-
-  if (loadingAuth) {
-    return <div className="p-8">Loading...</div>;
-  }
-
+  if (loadingAuth) return <div className="p-8">Loading...</div>;
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 

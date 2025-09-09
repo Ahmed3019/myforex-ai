@@ -5,9 +5,10 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useTradeDraft } from "../../context/TradeDraftContext";
+import { GROUPS, getSpec } from "../../utils/calc";
 
 const defaultState = {
   symbol: "EURUSD",
@@ -27,18 +28,23 @@ const AddTradeForm = ({ onTradeAdded = () => {} }) => {
   const { token } = useAuth();
   const { draft, setDraft } = useTradeDraft();
 
+  const [group, setGroup] = useState("FX_Majors");
   const [form, setForm] = useState(defaultState);
   const [error, setError] = useState("");
 
-  // لو فيه Draft من الـ Risk Calculator، املأ الحقول
+  const symbols = GROUPS[group] || [];
+  const spec = useMemo(() => getSpec(form.symbol), [form.symbol]);
+
   useEffect(() => {
     if (draft) {
+      const grp = Object.keys(GROUPS).find((g) => GROUPS[g].includes(draft.symbol)) || "FX_Majors";
+      setGroup(grp);
       setForm((prev) => ({
         ...prev,
         ...draft,
+        asset_class: draft.asset_class || spec.asset,
         tradeDate: draft.tradeDate || new Date().toISOString(),
       }));
-      // اختياري: امسح الدرافت بعد الملء
       setDraft(null);
     }
     // eslint-disable-next-line
@@ -47,6 +53,23 @@ const AddTradeForm = ({ onTradeAdded = () => {} }) => {
   const onChange = (e) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
+  };
+
+  const onChangeGroup = (e) => {
+    const g = e.target.value;
+    setGroup(g);
+    const first = GROUPS[g][0];
+    setForm((f) => ({
+      ...f,
+      symbol: first,
+      asset_class: getSpec(first).asset,
+    }));
+  };
+
+  const onChangeSymbol = (e) => {
+    const sym = e.target.value;
+    const s = getSpec(sym);
+    setForm((f) => ({ ...f, symbol: sym, asset_class: s.asset }));
   };
 
   const submit = async (e) => {
@@ -70,25 +93,43 @@ const AddTradeForm = ({ onTradeAdded = () => {} }) => {
     }
   };
 
+  const onKeyDown = (e) => {
+    if (e.key === "Enter") {
+      // السماح للإنتر يعمل حفظ سريع
+      e.preventDefault();
+      // simulate form submit
+      const fake = { preventDefault: () => {} };
+      submit(fake);
+    }
+  };
+
   return (
     <div className="p-4 bg-white border rounded">
       <div className="mb-3 font-semibold">Add Trade</div>
       {error && <div className="mb-2 text-red-600">{error}</div>}
 
-      <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <form onSubmit={submit} onKeyDown={onKeyDown} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="text-sm">Group</label>
+          <select value={group} onChange={onChangeGroup} className="w-full border rounded p-2">
+            {Object.keys(GROUPS).map((g) => (
+              <option key={g}>{g}</option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="text-sm">Symbol</label>
-          <input name="symbol" value={form.symbol} onChange={onChange} className="w-full border rounded p-2"/>
+          <select name="symbol" value={form.symbol} onChange={onChangeSymbol} className="w-full border rounded p-2">
+            {symbols.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
         </div>
 
         <div>
           <label className="text-sm">Asset</label>
-          <select name="asset_class" value={form.asset_class} onChange={onChange} className="w-full border rounded p-2">
-            <option>FX</option>
-            <option>Metals</option>
-            <option>Energy</option>
-            <option>Crypto</option>
-          </select>
+          <input name="asset_class" value={form.asset_class} readOnly className="w-full border rounded p-2 bg-gray-50"/>
         </div>
 
         <div>
@@ -101,10 +142,13 @@ const AddTradeForm = ({ onTradeAdded = () => {} }) => {
 
         <div>
           <label className="text-sm">Trade Date</label>
-          <input type="datetime-local" name="tradeDate"
-            value={form.tradeDate ? new Date(form.tradeDate).toISOString().slice(0,16) : ""}
-            onChange={(e)=> setForm(f=>({...f, tradeDate: new Date(e.target.value).toISOString()}))}
-            className="w-full border rounded p-2"/>
+          <input
+            type="datetime-local"
+            name="tradeDate"
+            value={form.tradeDate ? new Date(form.tradeDate).toISOString().slice(0, 16) : ""}
+            onChange={(e) => setForm((f) => ({ ...f, tradeDate: new Date(e.target.value).toISOString() }))}
+            className="w-full border rounded p-2"
+          />
         </div>
 
         <div>

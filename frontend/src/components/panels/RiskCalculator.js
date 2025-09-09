@@ -8,15 +8,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { SYMBOL_SPECS, getSpec, pipValuePerLotUSD, calcPips, suggestLotSize, rrTargets } from "../../utils/calc";
 import { useTradeDraft } from "../../context/TradeDraftContext";
-
-const GROUPS = {
-  FX: ["EURUSD","GBPUSD","AUDUSD","NZDUSD","USDJPY","EURJPY","GBPJPY","USDCHF","USDCAD"],
-  Metals: ["XAUUSD","XAGUSD"],
-  Energy: ["WTI"],
-  Crypto: ["BTCUSD","ETHUSD"],
-};
+import {
+  SYMBOL_SPECS,
+  GROUPS,
+  getSpec,
+  pipValuePerLotUSD,
+  calcPips,
+  suggestLotSize,
+  rrTargets,
+} from "../../utils/calc";
 
 const RiskCalculator = () => {
   const { token } = useAuth();
@@ -24,9 +25,8 @@ const RiskCalculator = () => {
   const navigate = useNavigate();
 
   const [balance, setBalance] = useState(100.0);
-
-  const [assetClass, setAssetClass] = useState("FX");
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [group, setGroup] = useState("FX_Majors");
+  const [symbol, setSymbol] = useState(GROUPS.FX_Majors[0]);
   const [direction, setDirection] = useState("BUY");
 
   const [entry, setEntry] = useState("");
@@ -76,10 +76,9 @@ const RiskCalculator = () => {
   const { tp } = rrTargets({ direction, entry, sl, rr: Number(rr) });
 
   const sendToAddTrade = () => {
-    // نجهّز Draft بنفس مفاتيح AddTradeForm
     const draft = {
       symbol,
-      asset_class: spec.asset === "FX" ? "FX" : spec.asset,
+      asset_class: spec.asset,
       direction,
       tradeDate: new Date().toISOString(),
       entryPrice: entry ? Number(entry) : null,
@@ -94,24 +93,28 @@ const RiskCalculator = () => {
     navigate("/dashboard?tab=trades");
   };
 
+  const allGroups = Object.keys(GROUPS);
+
   return (
     <div className="p-4 bg-white border rounded">
       <div className="mb-3 font-semibold">Risk Calculator</div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
-          <label className="text-sm">Asset</label>
+          <label className="text-sm">Group</label>
           <select
-            value={assetClass}
-            onChange={(e) => { 
-              const cls = e.target.value; 
-              setAssetClass(cls); 
-              const first = GROUPS[cls][0];
-              setSymbol(first); 
+            value={group}
+            onChange={(e) => {
+              const g = e.target.value;
+              setGroup(g);
+              const first = GROUPS[g][0];
+              setSymbol(first);
             }}
             className="w-full border rounded p-2"
           >
-            {Object.keys(GROUPS).map((k) => <option key={k}>{k}</option>)}
+            {allGroups.map((g) => (
+              <option key={g} value={g}>{g}</option>
+            ))}
           </select>
         </div>
 
@@ -122,13 +125,19 @@ const RiskCalculator = () => {
             onChange={(e) => setSymbol(e.target.value)}
             className="w-full border rounded p-2"
           >
-            {GROUPS[assetClass].map((s) => <option key={s}>{s}</option>)}
+            {GROUPS[group].map((s) => (
+              <option key={s}>{s}</option>
+            ))}
           </select>
         </div>
 
         <div>
           <label className="text-sm">Direction</label>
-          <select value={direction} onChange={(e)=>setDirection(e.target.value)} className="w-full border rounded p-2">
+          <select
+            value={direction}
+            onChange={(e) => setDirection(e.target.value)}
+            className="w-full border rounded p-2"
+          >
             <option>BUY</option>
             <option>SELL</option>
           </select>
@@ -136,21 +145,45 @@ const RiskCalculator = () => {
 
         <div>
           <label className="text-sm">Account Balance</label>
-          <input type="number" step="0.01" value={balance} onChange={(e)=>setBalance(e.target.value)} className="w-full border rounded p-2"/>
+          <input
+            type="number"
+            step="0.01"
+            value={balance}
+            onChange={(e) => setBalance(e.target.value)}
+            className="w-full border rounded p-2"
+          />
         </div>
 
         <div>
           <label className="text-sm">Entry</label>
-          <input type="number" step="0.00001" value={entry} onChange={(e)=>setEntry(e.target.value)} className="w-full border rounded p-2"/>
+          <input
+            type="number"
+            step="0.00001"
+            value={entry}
+            onChange={(e) => setEntry(e.target.value)}
+            className="w-full border rounded p-2"
+          />
         </div>
 
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <label className="text-sm">{usePipsMode ? "SL Pips" : "Stop Loss Price"}</label>
             {usePipsMode ? (
-              <input type="number" step="0.01" value={slPips} onChange={(e)=>setSlPips(e.target.value)} className="w-full border rounded p-2"/>
+              <input
+                type="number"
+                step="0.01"
+                value={slPips}
+                onChange={(e) => setSlPips(e.target.value)}
+                className="w-full border rounded p-2"
+              />
             ) : (
-              <input type="number" step="0.00001" value={sl} onChange={(e)=>setSL(e.target.value)} className="w-full border rounded p-2"/>
+              <input
+                type="number"
+                step="0.00001"
+                value={sl}
+                onChange={(e) => setSL(e.target.value)}
+                className="w-full border rounded p-2"
+              />
             )}
           </div>
           <button
@@ -164,12 +197,24 @@ const RiskCalculator = () => {
 
         <div>
           <label className="text-sm">Risk %</label>
-          <input type="number" step="0.1" value={riskPercent} onChange={(e)=>setRiskPercent(e.target.value)} className="w-full border rounded p-2"/>
+          <input
+            type="number"
+            step="0.1"
+            value={riskPercent}
+            onChange={(e) => setRiskPercent(e.target.value)}
+            className="w-full border rounded p-2"
+          />
         </div>
 
         <div>
           <label className="text-sm">R : R</label>
-          <input type="number" step="0.5" value={rr} onChange={(e)=>setRR(e.target.value)} className="w-full border rounded p-2"/>
+          <input
+            type="number"
+            step="0.5"
+            value={rr}
+            onChange={(e) => setRR(e.target.value)}
+            className="w-full border rounded p-2"
+          />
         </div>
       </div>
 
@@ -208,10 +253,7 @@ const RiskCalculator = () => {
           </div>
         </div>
         <div className="p-3 border rounded">
-          <div className="text-xs text-gray-500">Spec</div>
-          <div className="text-xs">
-            Asset: {spec.asset} • Contract: {spec.contractSize} • Quote: {spec.quote}
-          </div>
+          <div className="text-xs">Asset: {spec.asset} • Contract: {spec.contractSize} • Quote: {spec.quote}</div>
         </div>
       </div>
 
