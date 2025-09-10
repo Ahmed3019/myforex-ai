@@ -6,8 +6,9 @@
  */
 
 require("dotenv").config();
-const { sequelize } = require("./models");
 const app = require("./app");
+const { sequelize } = require("./models");
+
 
 const PORT = process.env.PORT || 4000;
 
@@ -15,13 +16,12 @@ const PORT = process.env.PORT || 4000;
   try {
     await sequelize.authenticate();
     console.log("✅ Database connection established successfully.");
-
-    await sequelize.sync(); // sync models
-
+    // NOTE: مفيش sync جبري هنا عشان ما نلمسش الجداول
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
     });
-  } catch (error) {
-    console.error("❌ Unable to connect to the database:", error);
+  } catch (err) {
+    console.error("❌ Unable to connect to the database:", err);
+    process.exit(1);
   }
 })();

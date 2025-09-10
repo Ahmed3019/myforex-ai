@@ -5,7 +5,7 @@
  * LinkedIn: https://www.linkedin.com/in/ahmedsalama1/
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
 const StatsPanel = () => {
@@ -13,7 +13,7 @@ const StatsPanel = () => {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await fetch("/api/trades/stats/all", {
         headers: { Authorization: `Bearer ${token}` },
@@ -24,11 +24,11 @@ const StatsPanel = () => {
     } catch (err) {
       setError(err.message);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (token) fetchStats();
-  }, [token]);
+  }, [token, fetchStats]);
 
   if (error) return <div className="text-red-500">{error}</div>;
   if (!stats) return <div>Loading stats...</div>;

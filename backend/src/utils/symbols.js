@@ -56,7 +56,15 @@ function flatPairs() {
   ];
 }
 
+/** 
+ * دالة مساعدة تجيب الـ metadata بتاع أي Symbol
+ */
+function getSymbolMeta(symbol) {
+  return flatPairs().find(s => s.symbol === symbol);
+}
+
 module.exports = {
   FX_MAJORS, FX_MINORS, FX_EXOTICS, METALS, ENERGY, CRYPTO,
-  TIMEFRAMES, STRATEGIES, LEVERAGES, flatPairs,
+  TIMEFRAMES, STRATEGIES, LEVERAGES,
+  flatPairs, getSymbolMeta,
 };
